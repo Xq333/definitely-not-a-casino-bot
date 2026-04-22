@@ -76,6 +76,8 @@
     let betPercent = 1;
     let fastMode = false;
     let spinCount = 0;
+    let startBalance = 0;
+    let takeProfit = 0; // 0 = disabled
 
     // --- Overlay ---
     function makeOverlay() {
@@ -103,8 +105,12 @@
     function report() {
       emit('PARTOUCHE_BOT_STATE', { balance: getBalance(), bet: getBet(), running });
       if (running) {
+        const bal = getBalance();
+        const profit = bal - startBalance;
+        const sign = profit >= 0 ? '+' : '';
         const m = fastMode ? ' FAST' : '';
-        setOverlay('BOT [' + gameType + ']' + m + ' #' + spinCount + '\nBal: ' + getBalance().toLocaleString() + '\nBet: ' + getBet().toLocaleString(), fastMode ? '#ff0' : '#0f0');
+        const tp = takeProfit > 0 ? '\nTP: ' + takeProfit.toLocaleString() : '';
+        setOverlay('BOT [' + gameType + ']' + m + ' #' + spinCount + '\nBal: ' + bal.toLocaleString() + ' (' + sign + profit.toLocaleString() + ')' + '\nBet: ' + getBet().toLocaleString() + tp, fastMode ? '#ff0' : '#0f0');
       }
     }
 
@@ -147,6 +153,13 @@
         emit('PARTOUCHE_BOT_LOG', { msg: 'Balance too low (' + bal + ')', type: 'warn' });
         return;
       }
+      if (takeProfit > 0 && bal >= takeProfit) {
+        stop();
+        const profit = bal - startBalance;
+        emit('PARTOUCHE_BOT_LOG', { msg: 'TAKE PROFIT HIT! Bal: ' + bal.toLocaleString() + ' (+' + profit.toLocaleString() + ')', type: 'success' });
+        setOverlay('TP HIT! Bal: ' + bal.toLocaleString() + '\nProfit: +' + profit.toLocaleString(), '#0f0');
+        return;
+      }
 
       // Set bet (only takes effect when game is idle)
       const target = calcBet(bal, betPercent);
@@ -158,12 +171,14 @@
       report();
     }
 
-    function start(pct, fast) {
+    function start(pct, fast, tp) {
       if (running) return;
       running = true;
       betPercent = pct || 1;
       fastMode = fast;
+      takeProfit = tp || 0;
       spinCount = 0;
+      startBalance = getBalance();
 
       setBet(calcBet(getBalance(), betPercent));
 
@@ -188,7 +203,7 @@
     window.addEventListener('PARTOUCHE_BOT_CMD', (event) => {
       const cmd = event.detail;
       console.log('[PARTOUCHE BOT] CMD:', cmd.action);
-      if (cmd.action === 'start') start(cmd.betPercent, cmd.fastMode);
+      if (cmd.action === 'start') start(cmd.betPercent, cmd.fastMode, cmd.takeProfit);
       else if (cmd.action === 'stop') stop();
       else if (cmd.action === 'getState') report();
     });

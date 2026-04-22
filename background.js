@@ -44,7 +44,7 @@ let loopInterval = null;
 async function runLoop() {
   const state = await chrome.storage.local.get([
     'running', 'toggleBonus', 'toggleWheel', 'toggleSlots',
-    'slotGame', 'betPercent', 'toggleFast', 'bjBet', 'bjHands', 'lastBonusClaim', 'lastWheelSpin',
+    'slotGame', 'betPercent', 'toggleFast', 'takeProfit', 'bjBet', 'bjHands', 'lastBonusClaim', 'lastWheelSpin',
     'slotsActive'
   ]);
 
@@ -103,7 +103,7 @@ async function runLoop() {
 
     if (ping?.path !== expectedPath) {
       await log(`Navigating to ${game}...`, 'info');
-      await sendToContent('startSlotPlay', { game, betPercent: betPct, fastMode: !!state.toggleFast, bjBet: state.bjBet || 1000, bjHands: state.bjHands || 1 });
+      await sendToContent('startSlotPlay', { game, betPercent: betPct, fastMode: !!state.toggleFast, takeProfit: state.takeProfit || 0, bjBet: state.bjBet || 1000, bjHands: state.bjHands || 1 });
     }
     // If already on game page, the content script auto-starts the bot
   }

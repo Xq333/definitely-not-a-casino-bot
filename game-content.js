@@ -50,7 +50,7 @@ setTimeout(injectBot, 3000);
 // Auto-restart: if the iframe reloaded (e.g. after error), check if bot should be running
 setTimeout(async () => {
   try {
-    const state = await chrome.storage.local.get(['running', 'toggleSlots', 'slotGame', 'betPercent', 'toggleFast', 'bjBet', 'bjHands']);
+    const state = await chrome.storage.local.get(['running', 'toggleSlots', 'slotGame', 'betPercent', 'toggleFast', 'takeProfit', 'bjBet', 'bjHands']);
     if (state.running && state.toggleSlots !== false) {
       console.log('[PARTOUCHE BOT] Auto-restarting bot after reload...');
       // Wait for the injected bot to be ready
@@ -60,6 +60,7 @@ setTimeout(async () => {
             action: 'start',
             betPercent: state.betPercent || 1,
             fastMode: !!state.toggleFast,
+            takeProfit: state.takeProfit || 0,
             betAmount: state.bjBet || 1000,
             numHands: state.bjHands || 1,
           }

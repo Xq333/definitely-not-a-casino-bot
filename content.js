@@ -95,7 +95,7 @@ async function spinDailyWheel() {
 }
 
 // --- Slot Auto-Play ---
-async function startSlotPlay(game, betPercent, fastMode, bjBet, bjHands) {
+async function startSlotPlay(game, betPercent, fastMode, bjBet, bjHands, takeProfit) {
   const gamePath = `/jeux-casino-gratuit/${game}`;
 
   if (window.location.pathname !== gamePath) {
@@ -119,6 +119,7 @@ async function startSlotPlay(game, betPercent, fastMode, bjBet, bjHands) {
     fastMode: !!fastMode,
     betAmount: bjBet || 1000,
     numHands: bjHands || 1,
+    takeProfit: takeProfit || 0,
   }, '*');
 
   return { success: true };
@@ -146,7 +147,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'spinDailyWheel':
         return await spinDailyWheel();
       case 'startSlotPlay':
-        return await startSlotPlay(msg.game, msg.betPercent, msg.fastMode, msg.bjBet, msg.bjHands);
+        return await startSlotPlay(msg.game, msg.betPercent, msg.fastMode, msg.bjBet, msg.bjHands, msg.takeProfit);
       case 'stopSlotPlay':
         return await stopSlotPlay();
       case 'dismissOverlays':
@@ -184,7 +185,7 @@ window.addEventListener('load', () => {
 
   // If on a game page and automation is running, auto-start the bot
   setTimeout(async () => {
-    const state = await chrome.storage.local.get(['running', 'toggleSlots', 'slotGame', 'betPercent', 'toggleFast', 'bjBet', 'bjHands']);
+    const state = await chrome.storage.local.get(['running', 'toggleSlots', 'slotGame', 'betPercent', 'toggleFast', 'bjBet', 'bjHands', 'takeProfit']);
     if (!state.running || state.toggleSlots === false) return;
 
     const expectedPath = `/jeux-casino-gratuit/${state.slotGame || 'slots-joker'}`;
@@ -201,6 +202,7 @@ window.addEventListener('load', () => {
           fastMode: !!state.toggleFast,
           betAmount: state.bjBet || 1000,
           numHands: state.bjHands || 1,
+          takeProfit: state.takeProfit || 0,
         }, '*');
       }
     }

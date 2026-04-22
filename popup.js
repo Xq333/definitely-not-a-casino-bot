@@ -21,7 +21,7 @@ function calcBetPreview(balance, pct) {
 async function loadState() {
   const state = await chrome.storage.local.get([
     'running', 'toggleBonus', 'toggleWheel', 'toggleSlots', 'toggleFast',
-    'slotGame', 'betPercent', 'bjBet', 'bjHands', 'logs', 'balance', 'currentBet'
+    'slotGame', 'betPercent', 'takeProfit', 'bjBet', 'bjHands', 'logs', 'balance', 'currentBet'
   ]);
 
   running = state.running || false;
@@ -32,6 +32,7 @@ async function loadState() {
   $('slotGame').value = state.slotGame || 'slots-joker';
   $('betPercent').value = state.betPercent || 1;
   $('betPercentLabel').textContent = (state.betPercent || 1) + '%';
+  $('takeProfit').value = state.takeProfit || 0;
   $('bjBet').value = state.bjBet || 1000;
   $('bjHands').value = state.bjHands || '1';
 
@@ -75,6 +76,7 @@ async function saveSettings() {
     toggleFast: $('toggleFast').checked,
     slotGame: $('slotGame').value,
     betPercent: parseFloat($('betPercent').value) || 1,
+    takeProfit: parseInt($('takeProfit').value) || 0,
     bjBet: parseInt($('bjBet').value) || 1000,
     bjHands: parseInt($('bjHands').value) || 1,
   });
@@ -109,7 +111,7 @@ $('betPercent').addEventListener('input', () => {
   });
 });
 
-for (const id of ['toggleBonus', 'toggleWheel', 'toggleSlots', 'toggleFast', 'betPercent', 'bjBet', 'bjHands']) {
+for (const id of ['toggleBonus', 'toggleWheel', 'toggleSlots', 'toggleFast', 'betPercent', 'takeProfit', 'bjBet', 'bjHands']) {
   $(id).addEventListener('change', saveSettings);
 }
 
