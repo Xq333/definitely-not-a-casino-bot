@@ -33,6 +33,8 @@
     let runningCount = 0;
     let cardsDealt = 0;
     let roundInProgress = false;
+    let startBalance = 0;
+    let handsPlayed = 0;
 
     // --- Overlay ---
     function makeOverlay() {
@@ -54,6 +56,12 @@
     }
     function emit(type, detail) {
       window.dispatchEvent(new CustomEvent(type, { detail }));
+    }
+
+    function profitLine() {
+      const profit = gl.balance - startBalance;
+      const sign = profit >= 0 ? '+' : '';
+      return 'P/L: ' + sign + profit.toLocaleString() + ' | Hands: ' + handsPlayed;
     }
 
     // --- Sprite frame → card rank mapping ---
@@ -160,6 +168,7 @@
         setOverlay(
           'BJ BOT | BETTING\n' +
           'Bal: ' + bal.toLocaleString() + '\n' +
+          profitLine() + '\n' +
           'Count: ' + runningCount + ' TC: ' + trueCount.toFixed(1) + '\n' +
           'Bet: ' + adjBet.toLocaleString(),
           trueCount >= 2 ? '#ff0' : '#0f0'
@@ -233,7 +242,7 @@
           'You: ' + cardNames + ' = ' + hand.total + (hand.soft ? ' soft' : '') + '\n' +
           'Dealer: ' + dealerName + '\n' +
           'Action: ' + actionName + '\n' +
-          'Count: ' + runningCount,
+          profitLine() + ' | Count: ' + runningCount,
           action === 'S' ? '#0f0' : '#ff0'
         );
 
@@ -265,14 +274,15 @@
             runningCount += hiLoValue(c.rank);
             cardsDealt++;
           }
+          handsPlayed++;
           roundInProgress = false;
         }
 
         setOverlay(
           'BJ BOT | WAITING\n' +
           'Bal: ' + bal.toLocaleString() + '\n' +
-          'Count: ' + runningCount + ' Cards: ' + cardsDealt + '\n' +
-          'State: ' + state,
+          profitLine() + '\n' +
+          'Count: ' + runningCount + ' Cards: ' + cardsDealt,
           '#0ff'
         );
       }
@@ -285,6 +295,8 @@
       betAmount = bet || 1000;
       numHands = hands || 1;
       roundInProgress = false;
+      startBalance = gl.balance;
+      handsPlayed = 0;
       emit('PARTOUCHE_BOT_LOG', { msg: 'BJ bot started! Bet: ' + betAmount, type: 'success' });
       interval = setInterval(tick, 2500);
       setTimeout(tick, 1000);
