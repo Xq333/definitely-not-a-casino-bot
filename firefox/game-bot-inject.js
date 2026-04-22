@@ -100,8 +100,7 @@
     let betPercent = 1;
     let spinCount = 0;
     let fastMode = false;
-    const FAST_INTERVAL = 500;
-    const NORMAL_INTERVAL = 7000;
+    let lastWasIdle = true; // track state transitions
 
     function createOverlay() {
       const el = document.createElement('div');
@@ -154,12 +153,28 @@
         return;
       }
 
-      if (!adapter.isIdle()) {
-        // In fast mode, spam spin/speedup to skip animations
-        if (fastMode) adapter.spin();
+      const idle = adapter.isIdle();
+
+      if (!idle) {
+        if (fastMode && lastWasIdle) {
+          // Just transitioned from idle → spinning: click once to speed up
+          adapter.spin();
+        }
+        lastWasIdle = false;
         return;
       }
 
+      // Game is idle
+      if (!lastWasIdle && fastMode) {
+        // Just transitioned from spinning → idle: click to skip win display
+        adapter.spin();
+        lastWasIdle = true;
+        return; // let next tick do the actual spin
+      }
+
+      lastWasIdle = true;
+
+      // Set smart bet
       const targetBet = adapter.calcBet(balance, betPercent);
       if (adapter.getBet() !== targetBet) {
         adapter.setBet(targetBet);
@@ -169,6 +184,7 @@
         });
       }
 
+      // Launch spin
       adapter.spin();
       spinCount++;
       console.log('[PARTOUCHE BOT] Spin #' + spinCount + ' bal=' + balance + ' bet=' + adapter.getBet());
@@ -191,9 +207,11 @@
       });
       updateOverlay('BOT ON [' + gameType + '] Starting...', '#0f0');
 
-      const interval = fastMode ? FAST_INTERVAL : NORMAL_INTERVAL;
+      // Fast mode: poll every 300ms to react to state changes
+      // Normal mode: spin every 7s with comfortable timing
+      const interval = fastMode ? 300 : 7000;
       spinInterval = setInterval(doSpin, interval);
-      setTimeout(doSpin, fastMode ? 500 : 2000);
+      setTimeout(doSpin, 2000);
       reportState();
     }
 
