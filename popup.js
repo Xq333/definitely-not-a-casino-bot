@@ -1,6 +1,16 @@
 const $ = (id) => document.getElementById(id);
 let running = false;
 
+function isBlackjack() {
+  return $('slotGame').value.includes('blackjack');
+}
+
+function toggleGameSettings() {
+  const bj = isBlackjack();
+  $('slotSettings').style.display = bj ? 'none' : 'block';
+  $('bjSettings').style.display = bj ? 'block' : 'none';
+}
+
 function calcBetPreview(balance, pct) {
   if (!balance) return '';
   const raw = Math.floor(balance * pct / 100);
@@ -11,7 +21,7 @@ function calcBetPreview(balance, pct) {
 async function loadState() {
   const state = await chrome.storage.local.get([
     'running', 'toggleBonus', 'toggleWheel', 'toggleSlots', 'toggleFast',
-    'slotGame', 'betPercent', 'logs', 'balance', 'currentBet'
+    'slotGame', 'betPercent', 'bjBet', 'bjHands', 'logs', 'balance', 'currentBet'
   ]);
 
   running = state.running || false;
@@ -22,6 +32,8 @@ async function loadState() {
   $('slotGame').value = state.slotGame || 'slots-joker';
   $('betPercent').value = state.betPercent || 1;
   $('betPercentLabel').textContent = (state.betPercent || 1) + '%';
+  $('bjBet').value = state.bjBet || 1000;
+  $('bjHands').value = state.bjHands || '1';
 
   if (state.balance) {
     $('balance').textContent = Number(state.balance).toLocaleString('fr-FR');
@@ -31,6 +43,7 @@ async function loadState() {
     $('betInfo').textContent = `Current bet: ${Number(state.currentBet).toLocaleString('fr-FR')}`;
   }
 
+  toggleGameSettings();
   updateUI();
   renderLogs(state.logs || []);
 }
@@ -62,6 +75,8 @@ async function saveSettings() {
     toggleFast: $('toggleFast').checked,
     slotGame: $('slotGame').value,
     betPercent: parseFloat($('betPercent').value) || 1,
+    bjBet: parseInt($('bjBet').value) || 1000,
+    bjHands: parseInt($('bjHands').value) || 1,
   });
 }
 
@@ -81,6 +96,11 @@ $('btnStop').addEventListener('click', async () => {
   updateUI();
 });
 
+$('slotGame').addEventListener('change', () => {
+  toggleGameSettings();
+  saveSettings();
+});
+
 $('betPercent').addEventListener('input', () => {
   const pct = parseFloat($('betPercent').value);
   $('betPercentLabel').textContent = pct + '%';
@@ -89,7 +109,7 @@ $('betPercent').addEventListener('input', () => {
   });
 });
 
-for (const id of ['toggleBonus', 'toggleWheel', 'toggleSlots', 'toggleFast', 'slotGame', 'betPercent']) {
+for (const id of ['toggleBonus', 'toggleWheel', 'toggleSlots', 'toggleFast', 'betPercent', 'bjBet', 'bjHands']) {
   $(id).addEventListener('change', saveSettings);
 }
 

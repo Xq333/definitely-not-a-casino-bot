@@ -26,9 +26,11 @@
     let running = false;
     let interval = null;
     let betAmount = 1000;
+    let numHands = 1; // 1, 2, or 3 hands
     let runningCount = 0; // Hi-Lo running count
     let cardsDealt = 0;
     let lastResult = null;
+    let hasPlacedFirstBet = false;
 
     // --- Intercept onResult to capture card data ---
     const origOnResult = gl.onResult.bind(gl);
@@ -212,24 +214,57 @@
         if (trueCount >= 2) adjBet = betAmount * 2;
         if (trueCount >= 4) adjBet = betAmount * 4;
         if (trueCount >= 6) adjBet = betAmount * 8;
-        adjBet = Math.min(adjBet, gl.maxBet, Math.floor(bal / 2));
+        adjBet = Math.min(adjBet, gl.maxBet, Math.floor(bal / (numHands + 1)));
 
         setOverlay(
           'BJ BOT | Bal: ' + bal.toLocaleString() + '\n' +
           'Count: ' + runningCount + ' (TC: ' + trueCount.toFixed(1) + ')\n' +
-          'Cards seen: ' + cardsDealt + '\n' +
-          'Bet: ' + adjBet.toLocaleString(),
+          'Hands: ' + numHands + ' | Bet/hand: ' + adjBet.toLocaleString(),
           trueCount >= 2 ? '#ff0' : '#0f0'
         );
 
-        // Place bet on middle spot only (1 hand)
-        gl.inputSelectSpot(1); // select middle
-        gl.bets = [0, adjBet, 0]; // bet only middle
-        gl.inputSameBet();
+        // After the first hand, use "same bet" for speed
+        if (hasPlacedFirstBet) {
+          gl.inputSameBet();
+          setTimeout(() => {
+            if (running && gl.state === 1) gl.inputDeal();
+          }, 1500);
+          return;
+        }
 
+        // First time: place bets manually on each spot
+        // Spots: 0=left, 1=middle, 2=right
+        // For 1 hand → middle only. 2 hands → left+right. 3 hands → all.
+        const spots = numHands === 1 ? [1] : numHands === 2 ? [0, 2] : [0, 1, 2];
+
+        gl.inputNewBet();
+        let delay = 300;
+        for (const spot of spots) {
+          setTimeout(() => {
+            gl.inputSelectSpot(spot);
+            // Place bet by clicking chips (build up to adjBet)
+            // Use largest chips first: 100k, 25k, 5k, 1k
+            const chips = [100000, 25000, 5000, 1000];
+            let remaining = adjBet;
+            let chipDelay = 0;
+            for (const chip of chips) {
+              while (remaining >= chip) {
+                setTimeout(() => gl.inputBet(chip), chipDelay);
+                remaining -= chip;
+                chipDelay += 100;
+              }
+            }
+          }, delay);
+          delay += 1500;
+        }
+
+        // Deal after all bets are placed
         setTimeout(() => {
-          if (running && gl.state === 1) gl.inputDeal();
-        }, 1000);
+          if (running && gl.state === 1) {
+            gl.inputDeal();
+            hasPlacedFirstBet = true;
+          }
+        }, delay + 1000);
         return;
       }
 
@@ -308,11 +343,13 @@
     }
 
     // --- Start/Stop ---
-    function start(bet) {
+    function start(bet, hands) {
       if (running) return;
       running = true;
       betAmount = bet || 1000;
-      console.log('[BJ BOT] Started! bet=' + betAmount);
+      numHands = Math.min(3, Math.max(1, hands || 1));
+      hasPlacedFirstBet = false;
+      console.log('[BJ BOT] Started! bet=' + betAmount + ' hands=' + numHands);
       emit('PARTOUCHE_BOT_LOG', { msg: 'Blackjack bot started! Bet: ' + betAmount.toLocaleString(), type: 'success' });
       setOverlay('BJ BOT ON | Bet: ' + betAmount.toLocaleString(), '#0f0');
       interval = setInterval(tick, 2000);
@@ -330,7 +367,7 @@
     window.addEventListener('PARTOUCHE_BOT_CMD', (event) => {
       const cmd = event.detail;
       console.log('[BJ BOT] CMD:', cmd.action);
-      if (cmd.action === 'start') start(cmd.betAmount || cmd.betPercent * gl.balance / 100 || 1000);
+      if (cmd.action === 'start') start(cmd.betAmount || 1000, cmd.numHands || 1);
       else if (cmd.action === 'stop') stop();
       else if (cmd.action === 'getState') {
         emit('PARTOUCHE_BOT_STATE', { balance: gl.balance, bet: gl.totalBet, running });

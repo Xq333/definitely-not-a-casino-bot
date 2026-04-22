@@ -115,25 +115,45 @@
     <label>
       <span style="font-size: 13px;">Game</span>
       <select id="slotGame">
-        <option value="slots-joker">Crazy Slot (Joker)</option>
-        <option value="western-bandits">Western Bandits</option>
-        <option value="megapot">Megapot</option>
-        <option value="bonuswild-vip">BonusWild VIP</option>
-        <option value="tiki-elements-rising">Tiki Elements</option>
-        <option value="partouche-cats">Partouche Cats</option>
-        <option value="classic-wild">Classic Wild</option>
-        <option value="legend-of-arthur">Legend of Arthur</option>
-        <option value="four-lucky-dragons">Four Lucky Dragons</option>
-        <option value="pt_kraken_slot">Kraken</option>
+        <optgroup label="Slots">
+          <option value="slots-joker">Crazy Slot (Joker)</option>
+          <option value="western-bandits">Western Bandits</option>
+          <option value="megapot">Megapot</option>
+          <option value="bonuswild-vip">BonusWild VIP</option>
+          <option value="tiki-elements-rising">Tiki Elements</option>
+          <option value="partouche-cats">Partouche Cats</option>
+          <option value="classic-wild">Classic Wild</option>
+          <option value="legend-of-arthur">Legend of Arthur</option>
+          <option value="four-lucky-dragons">Four Lucky Dragons</option>
+          <option value="pt_kraken_slot">Kraken</option>
+        </optgroup>
+        <optgroup label="Table Games">
+          <option value="blackjack-classic">Blackjack</option>
+        </optgroup>
       </select>
     </label>
-    <div style="margin-top: 12px;">
+    <div id="slotSettings" style="margin-top: 12px;">
       <span style="font-size: 13px;">Bet size (% of balance)</span>
       <div class="range-row">
         <input type="range" id="betPercent" min="0.5" max="5" step="0.5" value="1">
         <span class="range-value" id="betPercentLabel">1%</span>
       </div>
       <div class="bet-preview" id="betPreview">Ex: 100K balance = 1,000 bet</div>
+    </div>
+    <div id="bjSettings" style="margin-top: 12px; display: none;">
+      <label>
+        <span style="font-size: 13px;">Bet per hand</span>
+        <input type="number" id="bjBet" value="1000" min="1000" max="100000" step="1000">
+      </label>
+      <label style="display: block; margin-top: 10px;">
+        <span style="font-size: 13px;">Number of hands</span>
+        <select id="bjHands">
+          <option value="1">1 hand (safe)</option>
+          <option value="2">2 hands</option>
+          <option value="3">3 hands (max)</option>
+        </select>
+      </label>
+      <div class="bet-preview" style="margin-top: 6px;">Card counting adjusts bet automatically</div>
     </div>
   </div>
 
