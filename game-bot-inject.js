@@ -145,7 +145,7 @@
     }
 
     // --- Fast mode spin loop ---
-    // Simple: if button available → click → wait 300ms → if still available, click again → wait for idle → repeat
+    // Fast mode: click to spin, wait, click again to speed up reels, wait for idle, repeat
     async function fastSpin() {
       if (!botRunning || !fastMode) return;
       const balance = adapter.getBalance();
@@ -174,26 +174,16 @@
       // 3. Wait 300ms then click again to speed up reels
       await sleep(300);
       if (!botRunning || !fastMode) return;
-      if (!adapter.isIdle()) {
-        adapter.spin();
-      }
+      adapter.spin();
 
-      // 4. Wait until game returns to idle (spin result received)
+      // 4. Wait until game returns to idle
       while (botRunning && fastMode && !adapter.isIdle()) {
-        await sleep(150);
+        await sleep(200);
       }
       if (!botRunning || !fastMode) return;
 
-      // 5. Small pause then click to skip win display
-      await sleep(200);
-      if (adapter.canSpin()) {
-        adapter.spin(); // skip win animation
-      }
-
-      // 6. Brief pause before next cycle
-      await sleep(300);
-
-      // Loop
+      // 5. Wait for win display to finish, then loop
+      await sleep(500);
       if (botRunning && fastMode) fastSpin();
     }
 
