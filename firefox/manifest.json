@@ -41,7 +41,8 @@
     }
   },
   "web_accessible_resources": [
-    "game-bot-inject.js"
+    "game-bot-inject.js",
+    "blackjack-bot-inject.js"
   ],
   "icons": {
     "48": "icon48.png",

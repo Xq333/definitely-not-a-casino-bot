@@ -33,7 +33,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["game-bot-inject.js"],
+      "resources": ["game-bot-inject.js", "blackjack-bot-inject.js"],
       "matches": ["https://jeux-v2.ptech.fr/*"]
     }
   ],

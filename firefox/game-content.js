@@ -1,22 +1,30 @@
 // ===========================================================
-// Partouche Auto-Player v2.1 (Firefox) - Game Iframe Content Script
+// Partouche Auto-Player v2.4 - Game Iframe Content Script
 // Runs inside: https://jeux-v2.ptech.fr/* (game iframes)
 //
-// Injects game-bot-inject.js into the MAIN world via script.src
+// Detects game type and injects the right bot:
+// - Slots → game-bot-inject.js
+// - Blackjack → blackjack-bot-inject.js
 // ===========================================================
 
 console.log('[PARTOUCHE BOT] Content script loaded in iframe:', window.location.href);
 
-function injectGameBot() {
-  console.log('[PARTOUCHE BOT] Injecting bot via script.src...');
+function injectBot() {
+  // Detect game type from URL
+  const url = window.location.href.toLowerCase();
+  const isBlackjack = url.includes('blackjack');
+  const botFile = isBlackjack ? 'blackjack-bot-inject.js' : 'game-bot-inject.js';
+
+  console.log('[PARTOUCHE BOT] Detected:', isBlackjack ? 'BLACKJACK' : 'SLOTS', '→', botFile);
+
   const script = document.createElement('script');
-  script.src = browser.runtime.getURL('game-bot-inject.js');
+  script.src = browser.runtime.getURL(botFile);
   script.onload = () => {
-    console.log('[PARTOUCHE BOT] Inject script loaded successfully');
+    console.log('[PARTOUCHE BOT] ' + botFile + ' loaded');
     script.remove();
   };
   script.onerror = (e) => {
-    console.error('[PARTOUCHE BOT] Failed to load inject script:', e);
+    console.error('[PARTOUCHE BOT] Failed to load ' + botFile, e);
   };
   (document.head || document.documentElement).appendChild(script);
 }
@@ -37,4 +45,4 @@ window.addEventListener('message', (event) => {
   }
 });
 
-setTimeout(injectGameBot, 3000);
+setTimeout(injectBot, 3000);
