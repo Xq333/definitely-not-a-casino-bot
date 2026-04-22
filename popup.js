@@ -32,7 +32,7 @@ async function loadState() {
   $('slotGame').value = state.slotGame || 'slots-joker';
   $('betPercent').value = state.betPercent || 1;
   $('betPercentLabel').textContent = (state.betPercent || 1) + '%';
-  $('takeProfit').value = state.takeProfit || 0;
+  $('takeProfit').value = state.takeProfit || 100000000;
   $('bjBet').value = state.bjBet || 1000;
   $('bjHands').value = state.bjHands || '1';
 
