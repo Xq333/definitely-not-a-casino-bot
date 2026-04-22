@@ -1,6 +1,7 @@
 // ===========================================================
-// Partouche Blackjack Bot - Injected into MAIN world
-// Features: basic strategy + Hi-Lo card counting
+// Partouche Blackjack Bot v2 - Injected into MAIN world
+// Basic strategy + Hi-Lo card counting
+// Reads cards via spriteFrame, no dependency on onResult
 // ===========================================================
 
 (function() {
@@ -15,158 +16,23 @@
     if (!app) return;
     const root = app.root?.findByName?.('Root');
     const gl = root?.script?.gameLogic;
-    if (!gl || !gl.inputHit) return; // not a blackjack game
+    if (!gl || !gl.inputHit) return;
 
     clearInterval(waitForPC);
-    console.log('[BJ BOT] Blackjack detected! Setting up...');
+    console.log('[BJ BOT] Blackjack detected!');
     setupBot(app, gl);
   }, 500);
 
   function setupBot(app, gl) {
+    const table = gl.table;
+
     let running = false;
     let interval = null;
     let betAmount = 1000;
-    let numHands = 1; // 1, 2, or 3 hands
-    let runningCount = 0; // Hi-Lo running count
+    let numHands = 1;
+    let runningCount = 0;
     let cardsDealt = 0;
-    let lastResult = null;
-    let hasPlacedFirstBet = false;
-
-    // --- Intercept onResult to capture card data ---
-    const origOnResult = gl.onResult.bind(gl);
-    gl.onResult = function(data) {
-      lastResult = data;
-      console.log('[BJ BOT] Result received:', JSON.stringify(data).substring(0, 1000));
-      processResult(data);
-      return origOnResult(data);
-    };
-
-    // --- Card counting (Hi-Lo) ---
-    function hiLoValue(rank) {
-      if (rank >= 2 && rank <= 6) return 1;
-      if (rank >= 7 && rank <= 9) return 0;
-      // 10, J(11), Q(12), K(13), A(1 or 14)
-      return -1;
-    }
-
-    function countCards(cards) {
-      for (const card of cards) {
-        const rank = card.rank || card.value || card.v;
-        if (rank) {
-          runningCount += hiLoValue(rank);
-          cardsDealt++;
-        }
-      }
-    }
-
-    function processResult(data) {
-      // Try to extract cards from result data
-      // The format depends on what the server sends - we log it to figure out
-      try {
-        if (data.hands) {
-          for (const hand of data.hands) {
-            if (hand.cards) countCards(hand.cards);
-          }
-        }
-        if (data.dealer?.cards) countCards(data.dealer.cards);
-        // Also try flat arrays
-        if (data.cards) countCards(data.cards);
-      } catch(e) {
-        console.log('[BJ BOT] Error processing result:', e.message);
-      }
-    }
-
-    // --- Parse hand from result data ---
-    function getHandTotal(cards) {
-      let total = 0;
-      let aces = 0;
-      for (const card of cards) {
-        const rank = card.rank || card.value || card.v || 0;
-        if (rank === 1 || rank === 14) { // Ace
-          total += 11;
-          aces++;
-        } else if (rank >= 10 || rank === 11 || rank === 12 || rank === 13) {
-          total += 10;
-        } else {
-          total += rank;
-        }
-      }
-      while (total > 21 && aces > 0) {
-        total -= 10;
-        aces--;
-      }
-      return { total, soft: aces > 0 };
-    }
-
-    // --- Basic Strategy ---
-    // Returns: 'H' (hit), 'S' (stand), 'D' (double), 'P' (split)
-    function basicStrategy(playerTotal, soft, canSplit, dealerUp, pairRank) {
-      // --- Pairs ---
-      if (canSplit && pairRank) {
-        if (pairRank === 1 || pairRank === 8) return 'P'; // Always split A,8
-        if (pairRank === 10 || pairRank === 5) return basicStrategy(playerTotal, false, false, dealerUp); // Never split 10,5
-        if (pairRank === 4) return dealerUp >= 5 && dealerUp <= 6 ? 'P' : 'H';
-        if (pairRank === 9) return (dealerUp === 7 || dealerUp >= 10) ? 'S' : 'P';
-        if (pairRank === 7) return dealerUp <= 7 ? 'P' : 'H';
-        if (pairRank === 6) return dealerUp <= 6 ? 'P' : 'H';
-        if (pairRank === 3 || pairRank === 2) return dealerUp <= 7 ? 'P' : 'H';
-      }
-
-      // --- Soft hands ---
-      if (soft) {
-        if (playerTotal >= 19) return 'S';
-        if (playerTotal === 18) {
-          if (dealerUp <= 8) return 'S';
-          return 'H';
-        }
-        if (playerTotal === 17) {
-          if (dealerUp >= 3 && dealerUp <= 6) return 'D';
-          return 'H';
-        }
-        if (playerTotal <= 16 && playerTotal >= 15) {
-          if (dealerUp >= 4 && dealerUp <= 6) return 'D';
-          return 'H';
-        }
-        if (playerTotal <= 14) {
-          if (dealerUp >= 5 && dealerUp <= 6) return 'D';
-          return 'H';
-        }
-        return 'H';
-      }
-
-      // --- Hard hands ---
-      if (playerTotal >= 17) return 'S';
-      if (playerTotal >= 13 && playerTotal <= 16) {
-        return dealerUp <= 6 ? 'S' : 'H';
-      }
-      if (playerTotal === 12) {
-        return (dealerUp >= 4 && dealerUp <= 6) ? 'S' : 'H';
-      }
-      if (playerTotal === 11) return 'D';
-      if (playerTotal === 10) {
-        return dealerUp <= 9 ? 'D' : 'H';
-      }
-      if (playerTotal === 9) {
-        return (dealerUp >= 3 && dealerUp <= 6) ? 'D' : 'H';
-      }
-      return 'H'; // 8 or less
-    }
-
-    // --- Read cards from spriteFrame (fallback) ---
-    // Standard deck sprite: 13 cards per suit, 4 suits
-    // We'll calibrate this from the first onResult data
-    let spriteMap = null;
-
-    function readHandFromSprites(handEntity) {
-      const cards = [];
-      for (const child of handEntity.children) {
-        const frame = child.children?.[0]?.element?.spriteFrame;
-        if (frame !== undefined && spriteMap) {
-          cards.push(spriteMap[frame] || {rank: 0});
-        }
-      }
-      return cards;
-    }
+    let roundInProgress = false;
 
     // --- Overlay ---
     function makeOverlay() {
@@ -176,159 +42,206 @@
       el.id = 'bj-bot-overlay';
       el.style.cssText = 'position:fixed;top:8px;right:8px;background:rgba(0,0,0,0.9);color:#0f0;' +
         'font:bold 11px monospace;padding:10px 14px;border-radius:8px;z-index:999999;pointer-events:none;' +
-        'border:1px solid #0f0;min-width:220px;white-space:pre;line-height:1.5;';
+        'border:1px solid #0f0;min-width:250px;white-space:pre;line-height:1.5;';
       document.body.appendChild(el);
       return el;
     }
-
     function setOverlay(text, color) {
       const el = makeOverlay();
       el.textContent = text;
       el.style.color = color || '#0f0';
       el.style.borderColor = color || '#0f0';
     }
-
     function emit(type, detail) {
       window.dispatchEvent(new CustomEvent(type, { detail }));
     }
 
-    // --- Bot game loop ---
+    // --- Sprite frame → card rank mapping ---
+    // 4 suits x 13 ranks. Frame = suit*13 + rank_index
+    // rank_index: 0=A, 1=2, 2=3, ..., 8=9, 9=10, 10=J, 11=Q, 12=K
+    function frameToRank(frame) {
+      const rankIdx = frame % 13;
+      const ranks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10]; // A=1, J/Q/K=10
+      return ranks[rankIdx];
+    }
+
+    function frameToName(frame) {
+      const rankIdx = frame % 13;
+      const suitIdx = Math.floor(frame / 13);
+      const names = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+      const suits = ['♠','♥','♦','♣'];
+      return names[rankIdx] + (suits[suitIdx] || '?');
+    }
+
+    // --- Read cards from hand entity ---
+    function readHand(handEntity) {
+      const cards = [];
+      if (!handEntity || !handEntity.children) return cards;
+      for (const child of handEntity.children) {
+        if (child.name !== 'Card') continue;
+        const face = child.children?.[0];
+        if (!face) continue;
+        const frame = face.element?.spriteFrame;
+        if (frame === undefined || frame === null) continue;
+        // Skip face-down cards (flipped)
+        const cardScript = child.script?.card;
+        if (cardScript && !cardScript.flipped) {
+          // face-down card, skip
+          continue;
+        }
+        cards.push({ frame, rank: frameToRank(frame), name: frameToName(frame) });
+      }
+      return cards;
+    }
+
+    function handTotal(cards) {
+      let total = 0, aces = 0;
+      for (const c of cards) {
+        if (c.rank === 1) { total += 11; aces++; }
+        else { total += c.rank; }
+      }
+      while (total > 21 && aces > 0) { total -= 10; aces--; }
+      return { total, soft: aces > 0 };
+    }
+
+    // --- Card counting (Hi-Lo) ---
+    function hiLoValue(rank) {
+      if (rank >= 2 && rank <= 6) return 1;
+      if (rank >= 7 && rank <= 9) return 0;
+      return -1; // 10, J, Q, K, A
+    }
+
+    // --- Basic Strategy ---
+    function basicStrategy(total, soft, canSplit, dealerUp, pairRank) {
+      if (canSplit && pairRank) {
+        if (pairRank === 1 || pairRank === 8) return 'P';
+        if (pairRank === 10 || pairRank === 5) return basicStrategy(total, false, false, dealerUp);
+        if (pairRank === 4) return (dealerUp >= 5 && dealerUp <= 6) ? 'P' : 'H';
+        if (pairRank === 9) return (dealerUp === 7 || dealerUp >= 10) ? 'S' : 'P';
+        if (pairRank === 7) return dealerUp <= 7 ? 'P' : 'H';
+        if (pairRank === 6) return dealerUp <= 6 ? 'P' : 'H';
+        if (pairRank === 3 || pairRank === 2) return dealerUp <= 7 ? 'P' : 'H';
+      }
+      if (soft) {
+        if (total >= 19) return 'S';
+        if (total === 18) return dealerUp <= 8 ? 'S' : 'H';
+        if (total === 17) return (dealerUp >= 3 && dealerUp <= 6) ? 'D' : 'H';
+        if (total >= 15) return (dealerUp >= 4 && dealerUp <= 6) ? 'D' : 'H';
+        return (dealerUp >= 5 && dealerUp <= 6) ? 'D' : 'H';
+      }
+      if (total >= 17) return 'S';
+      if (total >= 13) return dealerUp <= 6 ? 'S' : 'H';
+      if (total === 12) return (dealerUp >= 4 && dealerUp <= 6) ? 'S' : 'H';
+      if (total === 11) return 'D';
+      if (total === 10) return dealerUp <= 9 ? 'D' : 'H';
+      if (total === 9) return (dealerUp >= 3 && dealerUp <= 6) ? 'D' : 'H';
+      return 'H';
+    }
+
+    // --- Main game loop ---
     function tick() {
       if (!running) return;
 
       const bal = gl.balance;
-      if (bal < betAmount * 2) {
+      const state = gl.state;
+      const canPlay = gl.canPlay;
+
+      if (bal < betAmount) {
         stop();
-        emit('PARTOUCHE_BOT_LOG', { msg: 'Balance too low for blackjack', type: 'warn' });
+        emit('PARTOUCHE_BOT_LOG', { msg: 'Balance too low', type: 'warn' });
         return;
       }
 
-      const state = gl.state;
-
-      // State 1: betting phase → place bet and deal
-      if (state === 1) {
-        // Adjust bet based on count (card counting!)
-        const decksRemaining = Math.max(1, (312 - cardsDealt) / 52); // 6 deck shoe
+      // --- BETTING PHASE ---
+      if (!roundInProgress && !canPlay) {
+        const decksRemaining = Math.max(1, (312 - cardsDealt) / 52);
         const trueCount = runningCount / decksRemaining;
         let adjBet = betAmount;
         if (trueCount >= 2) adjBet = betAmount * 2;
         if (trueCount >= 4) adjBet = betAmount * 4;
-        if (trueCount >= 6) adjBet = betAmount * 8;
-        adjBet = Math.min(adjBet, gl.maxBet, Math.floor(bal / (numHands + 1)));
+        adjBet = Math.min(adjBet, gl.maxBet, Math.floor(bal / 2));
 
         setOverlay(
-          'BJ BOT | Bal: ' + bal.toLocaleString() + '\n' +
-          'Count: ' + runningCount + ' (TC: ' + trueCount.toFixed(1) + ')\n' +
-          'Hands: ' + numHands + ' | Bet/hand: ' + adjBet.toLocaleString(),
+          'BJ BOT | BETTING\n' +
+          'Bal: ' + bal.toLocaleString() + '\n' +
+          'Count: ' + runningCount + ' TC: ' + trueCount.toFixed(1) + '\n' +
+          'Bet: ' + adjBet.toLocaleString(),
           trueCount >= 2 ? '#ff0' : '#0f0'
         );
 
-        // After the first hand, use "same bet" for speed
-        if (hasPlacedFirstBet) {
+        // Use same bet (quick) or place new bet
+        try {
           gl.inputSameBet();
-          setTimeout(() => {
-            if (running && gl.state === 1) gl.inputDeal();
-          }, 1500);
-          return;
+        } catch(e) {
+          // First time or error - try manual bet
+          try {
+            gl.inputNewBet();
+            gl.inputSelectSpot(1);
+            gl.inputBet(adjBet);
+          } catch(e2) {}
         }
 
-        // First time: place bets manually on each spot
-        // Spots: 0=left, 1=middle, 2=right
-        // For 1 hand → middle only. 2 hands → left+right. 3 hands → all.
-        const spots = numHands === 1 ? [1] : numHands === 2 ? [0, 2] : [0, 1, 2];
-
-        gl.inputNewBet();
-        let delay = 300;
-        for (const spot of spots) {
-          setTimeout(() => {
-            gl.inputSelectSpot(spot);
-            // Place bet by clicking chips (build up to adjBet)
-            // Use largest chips first: 100k, 25k, 5k, 1k
-            const chips = [100000, 25000, 5000, 1000];
-            let remaining = adjBet;
-            let chipDelay = 0;
-            for (const chip of chips) {
-              while (remaining >= chip) {
-                setTimeout(() => gl.inputBet(chip), chipDelay);
-                remaining -= chip;
-                chipDelay += 100;
-              }
-            }
-          }, delay);
-          delay += 1500;
-        }
-
-        // Deal after all bets are placed
+        // Deal after a delay
+        roundInProgress = true;
         setTimeout(() => {
-          if (running && gl.state === 1) {
-            gl.inputDeal();
-            hasPlacedFirstBet = true;
+          if (running) {
+            try { gl.inputDeal(); } catch(e) {}
           }
-        }, delay + 1000);
+        }, 2000);
         return;
       }
 
-      // State 2: playing phase → make decisions
-      if (state === 2 && gl.canPlay) {
-        // Read current hand from last result
-        if (!lastResult) {
-          setOverlay('BJ BOT | Waiting for cards...', '#ff0');
-          return;
+      // --- PLAYING PHASE ---
+      if (canPlay) {
+        // Read player hands from table entities
+        const hands = table.hands || [];
+        const stacks = table.stacks || [];
+
+        // Find dealer's up card (first card of dealer's hand/stack)
+        let dealerUp = 10; // default assumption
+        let dealerCards = [];
+        if (stacks[0]) {
+          dealerCards = readHand(stacks[0]);
+          if (dealerCards.length > 0) dealerUp = dealerCards[0].rank;
         }
 
-        makeDecision();
-        return;
-      }
-
-      // Other states: waiting for animations/results
-      setOverlay(
-        'BJ BOT | Bal: ' + bal.toLocaleString() + '\n' +
-        'Count: ' + runningCount + ' (Cards: ' + cardsDealt + ')\n' +
-        'State: ' + state + ' | Waiting...',
-        '#0ff'
-      );
-    }
-
-    function makeDecision() {
-      if (!lastResult || !gl.canPlay) return;
-
-      try {
-        // Try to get hand data from result
-        const hands = lastResult.hands || lastResult.spots || [];
-        const dealer = lastResult.dealer || {};
-        const dealerCards = dealer.cards || [];
-        const dealerUp = dealerCards[0]?.rank || dealerCards[0]?.value || dealerCards[0]?.v || 10;
-
-        // Find the active player hand
+        // Find the active player hand (the one we need to act on)
         let playerCards = [];
-        for (const h of hands) {
-          if (h && h.cards && h.cards.length > 0) {
-            playerCards = h.cards;
+        let playerHandStr = '?';
+        for (const hand of hands) {
+          const cards = readHand(hand);
+          if (cards.length > 0) {
+            playerCards = cards;
             break;
           }
         }
 
         if (playerCards.length === 0) {
-          console.log('[BJ BOT] No player cards found in result, standing');
+          // Can't read cards - stand to be safe
+          setOverlay('BJ BOT | PLAYING\nCan\'t read cards\nSTANDING (safe)', '#f90');
           gl.inputStand();
           return;
         }
 
-        const hand = getHandTotal(playerCards);
-        const isPair = playerCards.length === 2 &&
-          (playerCards[0].rank || playerCards[0].value) === (playerCards[1].rank || playerCards[1].value);
-        const pairRank = isPair ? (playerCards[0].rank || playerCards[0].value) : null;
+        const hand = handTotal(playerCards);
+        const cardNames = playerCards.map(c => c.name).join(' ');
+        const dealerName = dealerCards.length > 0 ? dealerCards[0].name : '?';
+        const isPair = playerCards.length === 2 && playerCards[0].rank === playerCards[1].rank;
+        const pairRank = isPair ? playerCards[0].rank : null;
 
         const action = basicStrategy(hand.total, hand.soft, gl.canSplit && isPair, dealerUp, pairRank);
+        const actionName = {H:'HIT', S:'STAND', D:'DOUBLE', P:'SPLIT'}[action];
 
         setOverlay(
-          'BJ BOT | ' + hand.total + (hand.soft ? ' soft' : '') + ' vs ' + dealerUp + '\n' +
-          'Action: ' + {H:'HIT',S:'STAND',D:'DOUBLE',P:'SPLIT'}[action] + '\n' +
-          'Count: ' + runningCount + ' | Bal: ' + gl.balance.toLocaleString(),
+          'BJ BOT | PLAYING\n' +
+          'You: ' + cardNames + ' = ' + hand.total + (hand.soft ? ' soft' : '') + '\n' +
+          'Dealer: ' + dealerName + '\n' +
+          'Action: ' + actionName + '\n' +
+          'Count: ' + runningCount,
           action === 'S' ? '#0f0' : '#ff0'
         );
 
-        console.log('[BJ BOT] Hand:', hand.total, hand.soft ? 'soft' : 'hard', 'vs dealer', dealerUp, '→', action);
+        console.log('[BJ BOT]', cardNames, '(' + hand.total + ')', 'vs', dealerName, '→', actionName);
 
         switch (action) {
           case 'H': gl.inputHit(); break;
@@ -336,9 +249,36 @@
           case 'D': gl.canDouble ? gl.inputDouble() : gl.inputHit(); break;
           case 'P': gl.canSplit ? gl.inputSplit() : gl.inputHit(); break;
         }
-      } catch(e) {
-        console.log('[BJ BOT] Decision error:', e.message, 'standing');
-        gl.inputStand();
+        return;
+      }
+
+      // --- WAITING (between rounds, animations) ---
+      if (roundInProgress && !canPlay) {
+        // Round ended - count cards and reset
+        // Try to read all visible cards for counting
+        const allCards = [];
+        for (const hand of (table.hands || [])) {
+          allCards.push(...readHand(hand));
+        }
+        for (const stack of (table.stacks || [])) {
+          allCards.push(...readHand(stack));
+        }
+
+        if (allCards.length > 0 && roundInProgress) {
+          for (const c of allCards) {
+            runningCount += hiLoValue(c.rank);
+            cardsDealt++;
+          }
+          roundInProgress = false;
+        }
+
+        setOverlay(
+          'BJ BOT | WAITING\n' +
+          'Bal: ' + bal.toLocaleString() + '\n' +
+          'Count: ' + runningCount + ' Cards: ' + cardsDealt + '\n' +
+          'State: ' + state,
+          '#0ff'
+        );
       }
     }
 
@@ -347,44 +287,41 @@
       if (running) return;
       running = true;
       betAmount = bet || 1000;
-      numHands = Math.min(3, Math.max(1, hands || 1));
-      hasPlacedFirstBet = false;
-      console.log('[BJ BOT] Started! bet=' + betAmount + ' hands=' + numHands);
-      emit('PARTOUCHE_BOT_LOG', { msg: 'Blackjack bot started! Bet: ' + betAmount.toLocaleString(), type: 'success' });
-      setOverlay('BJ BOT ON | Bet: ' + betAmount.toLocaleString(), '#0f0');
-      interval = setInterval(tick, 2000);
+      numHands = hands || 1;
+      roundInProgress = false;
+      emit('PARTOUCHE_BOT_LOG', { msg: 'BJ bot started! Bet: ' + betAmount, type: 'success' });
+      interval = setInterval(tick, 2500);
       setTimeout(tick, 1000);
     }
 
     function stop() {
       running = false;
+      roundInProgress = false;
       if (interval) { clearInterval(interval); interval = null; }
-      emit('PARTOUCHE_BOT_LOG', { msg: 'Blackjack bot stopped', type: 'warn' });
+      emit('PARTOUCHE_BOT_LOG', { msg: 'BJ bot stopped', type: 'warn' });
       setOverlay('BJ BOT OFF', '#f44');
     }
 
     // --- Commands ---
     window.addEventListener('PARTOUCHE_BOT_CMD', (event) => {
       const cmd = event.detail;
-      console.log('[BJ BOT] CMD:', cmd.action);
       if (cmd.action === 'start') start(cmd.betAmount || 1000, cmd.numHands || 1);
       else if (cmd.action === 'stop') stop();
       else if (cmd.action === 'getState') {
-        emit('PARTOUCHE_BOT_STATE', { balance: gl.balance, bet: gl.totalBet, running });
-      }
-      else if (cmd.action === 'resetCount') {
-        runningCount = 0;
-        cardsDealt = 0;
-        emit('PARTOUCHE_BOT_LOG', { msg: 'Card count reset', type: 'info' });
+        emit('PARTOUCHE_BOT_STATE', { balance: gl.balance, running });
       }
     });
 
-    // Periodic state report
     setInterval(() => {
-      emit('PARTOUCHE_BOT_STATE', { balance: gl.balance, bet: gl.totalBet, running });
+      emit('PARTOUCHE_BOT_STATE', { balance: gl.balance, running });
     }, 3000);
 
-    setOverlay('BJ BOT READY\nMin bet: ' + gl.minBet.toLocaleString() + '\nMax bet: ' + gl.maxBet.toLocaleString(), '#0ff');
-    emit('PARTOUCHE_BOT_LOG', { msg: 'Blackjack bot ready! Bal: ' + gl.balance.toLocaleString(), type: 'success' });
+    setOverlay(
+      'BJ BOT READY\n' +
+      'Bal: ' + gl.balance.toLocaleString() + '\n' +
+      'Min: ' + gl.minBet.toLocaleString() + ' Max: ' + gl.maxBet.toLocaleString(),
+      '#0ff'
+    );
+    emit('PARTOUCHE_BOT_LOG', { msg: 'BJ bot ready! Bal: ' + gl.balance.toLocaleString(), type: 'success' });
   }
 })();
