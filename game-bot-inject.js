@@ -108,11 +108,24 @@
       }
     }
 
+    // --- Error detection ---
+    function checkForError() {
+      const allText = document.body?.innerText || '';
+      if (allText.includes('Erreur') || allText.includes('erreur') || allText.includes('recharger')) {
+        console.log('[PARTOUCHE BOT] Error popup detected, reloading...');
+        emit('PARTOUCHE_BOT_LOG', { msg: 'Error detected, reloading...', type: 'error' });
+        window.location.reload();
+        return true;
+      }
+      return false;
+    }
+
     // --- The core loop: just click spin, like pressing space ---
     let wasPaused = false;
 
     function tick() {
       if (!running) return;
+      if (checkForError()) return;
 
       // Don't click during bonus/mini-games (spin button disappears)
       if (!spinBtn.enabled || !spinBtn.button.active) {

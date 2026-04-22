@@ -142,9 +142,23 @@
       return 'H';
     }
 
+    // --- Error detection: check for error popup and reload ---
+    function checkForError() {
+      // Look for error modal/popup in the DOM
+      const allText = document.body?.innerText || '';
+      if (allText.includes('Erreur') || allText.includes('erreur') || allText.includes('recharger')) {
+        console.log('[BJ BOT] Error popup detected, reloading...');
+        emit('PARTOUCHE_BOT_LOG', { msg: 'Error detected, reloading game...', type: 'error' });
+        window.location.reload();
+        return true;
+      }
+      return false;
+    }
+
     // --- Main game loop ---
     function tick() {
       if (!running) return;
+      if (checkForError()) return;
 
       const bal = gl.balance;
       const state = gl.state;
