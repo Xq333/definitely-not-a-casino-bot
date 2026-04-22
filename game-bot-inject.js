@@ -109,8 +109,24 @@
     }
 
     // --- The core loop: just click spin, like pressing space ---
+    let wasPaused = false;
+
     function tick() {
       if (!running) return;
+
+      // Don't click during bonus/mini-games (spin button disappears)
+      if (!spinBtn.enabled || !spinBtn.button.active) {
+        if (!wasPaused) {
+          setOverlay('BOT PAUSED (mini-game)', '#f90');
+          emit('PARTOUCHE_BOT_LOG', { msg: 'Mini-game detected, pausing...', type: 'info' });
+          wasPaused = true;
+        }
+        return;
+      }
+      if (wasPaused) {
+        emit('PARTOUCHE_BOT_LOG', { msg: 'Mini-game over, resuming', type: 'success' });
+        wasPaused = false;
+      }
 
       const bal = getBalance();
       if (bal < 10000) {
@@ -124,9 +140,6 @@
       if (getBet() !== target) setBet(target);
 
       // Just click. Like pressing space.
-      // - If idle: starts a spin
-      // - If reels spinning: speeds them up
-      // - If showing win: skips it
       clickSpin();
       spinCount++;
       report();
