@@ -83,12 +83,8 @@
         if (!face) continue;
         const frame = face.element?.spriteFrame;
         if (frame === undefined || frame === null) continue;
-        // Skip face-down cards (flipped)
-        const cardScript = child.script?.card;
-        if (cardScript && !cardScript.flipped) {
-          // face-down card, skip
-          continue;
-        }
+        // Log raw frame for debugging
+        console.log('[BJ BOT] Card frame:', frame, '→', frameToName(frame));
         cards.push({ frame, rank: frameToRank(frame), name: frameToName(frame) });
       }
       return cards;
@@ -224,8 +220,8 @@
         }
 
         const hand = handTotal(playerCards);
-        const cardNames = playerCards.map(c => c.name).join(' ');
-        const dealerName = dealerCards.length > 0 ? dealerCards[0].name : '?';
+        const cardNames = playerCards.map(c => c.name + '(' + c.frame + ')').join(' ');
+        const dealerName = dealerCards.length > 0 ? dealerCards[0].name + '(' + dealerCards[0].frame + ')' : '?';
         const isPair = playerCards.length === 2 && playerCards[0].rank === playerCards[1].rank;
         const pairRank = isPair ? playerCards[0].rank : null;
 
