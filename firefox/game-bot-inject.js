@@ -99,6 +99,9 @@
     let spinInterval = null;
     let betPercent = 1;
     let spinCount = 0;
+    let fastMode = false;
+    const FAST_INTERVAL = 500;
+    const NORMAL_INTERVAL = 7000;
 
     function createOverlay() {
       const el = document.createElement('div');
@@ -131,11 +134,12 @@
         running: botRunning,
       });
       if (botRunning) {
+        const mode = fastMode ? ' FAST' : '';
         updateOverlay(
-          'BOT ON [' + gameType + '] Spins: ' + spinCount + '\n' +
+          'BOT ON [' + gameType + ']' + mode + ' #' + spinCount + '\n' +
           'Bal: ' + adapter.getBalance().toLocaleString() + '\n' +
           'Bet: ' + adapter.getBet().toLocaleString(),
-          '#0f0'
+          fastMode ? '#ff0' : '#0f0'
         );
       }
     }
@@ -151,7 +155,9 @@
       }
 
       if (!adapter.isIdle()) {
-        return; // still animating
+        // In fast mode, spam spin/speedup to skip animations
+        if (fastMode) adapter.spin();
+        return;
       }
 
       const targetBet = adapter.calcBet(balance, betPercent);
@@ -185,8 +191,9 @@
       });
       updateOverlay('BOT ON [' + gameType + '] Starting...', '#0f0');
 
-      spinInterval = setInterval(doSpin, 7000);
-      setTimeout(doSpin, 2000);
+      const interval = fastMode ? FAST_INTERVAL : NORMAL_INTERVAL;
+      spinInterval = setInterval(doSpin, interval);
+      setTimeout(doSpin, fastMode ? 500 : 2000);
       reportState();
     }
 
@@ -202,7 +209,10 @@
       const cmd = event.detail;
       console.log('[PARTOUCHE BOT] Command:', cmd.action);
       switch (cmd.action) {
-        case 'start': startBot(cmd.betPercent || 1); break;
+        case 'start':
+          fastMode = !!cmd.fastMode;
+          startBot(cmd.betPercent || 1);
+          break;
         case 'stop': stopBot(); break;
         case 'spin': if (adapter.isIdle()) adapter.spin(); break;
         case 'getState': reportState(); break;

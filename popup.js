@@ -10,7 +10,7 @@ function calcBetPreview(balance, pct) {
 
 async function loadState() {
   const state = await chrome.storage.local.get([
-    'running', 'toggleBonus', 'toggleWheel', 'toggleSlots',
+    'running', 'toggleBonus', 'toggleWheel', 'toggleSlots', 'toggleFast',
     'slotGame', 'betPercent', 'logs', 'balance', 'currentBet'
   ]);
 
@@ -18,6 +18,7 @@ async function loadState() {
   $('toggleBonus').checked = state.toggleBonus !== false;
   $('toggleWheel').checked = state.toggleWheel !== false;
   $('toggleSlots').checked = state.toggleSlots !== false;
+  $('toggleFast').checked = state.toggleFast || false;
   $('slotGame').value = state.slotGame || 'slots-joker';
   $('betPercent').value = state.betPercent || 1;
   $('betPercentLabel').textContent = (state.betPercent || 1) + '%';
@@ -58,6 +59,7 @@ async function saveSettings() {
     toggleBonus: $('toggleBonus').checked,
     toggleWheel: $('toggleWheel').checked,
     toggleSlots: $('toggleSlots').checked,
+    toggleFast: $('toggleFast').checked,
     slotGame: $('slotGame').value,
     betPercent: parseFloat($('betPercent').value) || 1,
   });
@@ -87,7 +89,7 @@ $('betPercent').addEventListener('input', () => {
   });
 });
 
-for (const id of ['toggleBonus', 'toggleWheel', 'toggleSlots', 'slotGame', 'betPercent']) {
+for (const id of ['toggleBonus', 'toggleWheel', 'toggleSlots', 'toggleFast', 'slotGame', 'betPercent']) {
   $(id).addEventListener('change', saveSettings);
 }
 
