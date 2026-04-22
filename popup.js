@@ -15,10 +15,10 @@ async function loadState() {
   ]);
 
   running = state.running || false;
-  $('toggleBonus').checked = state.toggleBonus !== false;
-  $('toggleWheel').checked = state.toggleWheel !== false;
+  $('toggleBonus').checked = state.toggleBonus || false;
+  $('toggleWheel').checked = state.toggleWheel || false;
   $('toggleSlots').checked = state.toggleSlots !== false;
-  $('toggleFast').checked = state.toggleFast || false;
+  $('toggleFast').checked = state.toggleFast !== false;
   $('slotGame').value = state.slotGame || 'slots-joker';
   $('betPercent').value = state.betPercent || 1;
   $('betPercentLabel').textContent = (state.betPercent || 1) + '%';

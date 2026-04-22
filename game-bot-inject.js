@@ -50,6 +50,7 @@
         getBet()      { return pi.bet; },
         setBet(v)     { pi.bet = v; },
         isIdle()      { return pi.gameplay === 0; },
+        canSpin()     { return spinBtn.button.active; },
         spin()        { spinBtn.fire('click'); },
         getBetLevels() { return BET_LEVELS; },
         calcBet(balance, pct) {
@@ -81,6 +82,7 @@
           gl.coin = bestCoin;
         },
         isIdle()      { return gl.state === 1; },
+        canSpin()     { return gl.canSpin; },
         spin()        { gl.inputSpin(); },
         getBetLevels() { return BET_LEVELS; },
         calcBet(balance, pct) {
@@ -100,8 +102,6 @@
     let betPercent = 1;
     let spinCount = 0;
     let fastMode = false;
-    let phase = 'idle';    // idle | spinning | cooldown
-    let cooldownUntil = 0; // timestamp: don't act until this time
 
     function createOverlay() {
       const el = document.createElement('div');
@@ -144,13 +144,10 @@
       }
     }
 
-    function doSpin() {
-      if (!botRunning) return;
-      const now = Date.now();
-
-      // Respect cooldown (short pause between actions to let game process)
-      if (now < cooldownUntil) return;
-
+    // --- Fast mode spin loop ---
+    // Simple: if button available → click → wait 300ms → if still available, click again → wait for idle → repeat
+    async function fastSpin() {
+      if (!botRunning || !fastMode) return;
       const balance = adapter.getBalance();
 
       if (balance < 10000) {
@@ -159,46 +156,77 @@
         return;
       }
 
-      const idle = adapter.isIdle();
+      // Set bet
+      const targetBet = adapter.calcBet(balance, betPercent);
+      if (adapter.getBet() !== targetBet) adapter.setBet(targetBet);
 
-      if (phase === 'idle' && idle) {
-        // Ready to spin: set bet and launch
-        const targetBet = adapter.calcBet(balance, betPercent);
-        if (adapter.getBet() !== targetBet) {
-          adapter.setBet(targetBet);
-          emit('PARTOUCHE_BOT_LOG', {
-            msg: 'Bet: ' + adapter.getBet().toLocaleString() + ' (' + betPercent + '% of ' + balance.toLocaleString() + ')',
-            type: 'info'
-          });
-        }
+      // 1. Wait for spin button to be available
+      while (botRunning && fastMode && !adapter.canSpin()) {
+        await sleep(200);
+      }
+      if (!botRunning || !fastMode) return;
+
+      // 2. Click to start spin
+      adapter.spin();
+      spinCount++;
+      reportState();
+
+      // 3. Wait 300ms then click again to speed up reels
+      await sleep(300);
+      if (!botRunning || !fastMode) return;
+      if (!adapter.isIdle()) {
         adapter.spin();
-        spinCount++;
-        phase = 'spinning';
-        cooldownUntil = now + 800; // wait 800ms before trying to speed up
-        console.log('[PARTOUCHE BOT] Spin #' + spinCount + ' bal=' + balance + ' bet=' + adapter.getBet());
-        reportState();
+      }
+
+      // 4. Wait until game returns to idle (spin result received)
+      while (botRunning && fastMode && !adapter.isIdle()) {
+        await sleep(150);
+      }
+      if (!botRunning || !fastMode) return;
+
+      // 5. Small pause then click to skip win display
+      await sleep(200);
+      if (adapter.canSpin()) {
+        adapter.spin(); // skip win animation
+      }
+
+      // 6. Brief pause before next cycle
+      await sleep(300);
+
+      // Loop
+      if (botRunning && fastMode) fastSpin();
+    }
+
+    function sleep(ms) {
+      return new Promise(r => setTimeout(r, ms));
+    }
+
+    // --- Normal mode spin (simple interval) ---
+    function doSpin() {
+      if (!botRunning) return;
+      const balance = adapter.getBalance();
+
+      if (balance < 10000) {
+        stopBot();
+        emit('PARTOUCHE_BOT_LOG', { msg: 'Balance too low (' + balance + '), stopping', type: 'warn' });
         return;
       }
 
-      if (phase === 'spinning' && !idle && fastMode) {
-        // Reels are spinning: click once to speed up / stop reels
-        adapter.spin();
-        phase = 'cooldown';
-        cooldownUntil = now + 500; // wait 500ms for reels to settle
-        return;
+      if (!adapter.isIdle()) return;
+
+      const targetBet = adapter.calcBet(balance, betPercent);
+      if (adapter.getBet() !== targetBet) {
+        adapter.setBet(targetBet);
+        emit('PARTOUCHE_BOT_LOG', {
+          msg: 'Bet: ' + adapter.getBet().toLocaleString() + ' (' + betPercent + '% of ' + balance.toLocaleString() + ')',
+          type: 'info'
+        });
       }
 
-      if ((phase === 'spinning' || phase === 'cooldown') && idle) {
-        // Spin finished, game is idle again
-        if (fastMode) {
-          // Click to skip win animation, then short pause before next spin
-          adapter.spin();
-          cooldownUntil = now + 400;
-        }
-        phase = 'idle';
-        reportState();
-        return;
-      }
+      adapter.spin();
+      spinCount++;
+      console.log('[PARTOUCHE BOT] Spin #' + spinCount + ' bal=' + balance + ' bet=' + adapter.getBet());
+      reportState();
     }
 
     function startBot(pct) {
@@ -217,11 +245,14 @@
       });
       updateOverlay('BOT ON [' + gameType + '] Starting...', '#0f0');
 
-      // Fast mode: poll every 300ms to react to state changes
-      // Normal mode: spin every 7s with comfortable timing
-      const interval = fastMode ? 300 : 7000;
-      spinInterval = setInterval(doSpin, interval);
-      setTimeout(doSpin, 2000);
+      if (fastMode) {
+        // Fast mode: async loop that reacts to game state
+        setTimeout(fastSpin, 2000);
+      } else {
+        // Normal mode: simple interval
+        spinInterval = setInterval(doSpin, 7000);
+        setTimeout(doSpin, 2000);
+      }
       reportState();
     }
 
