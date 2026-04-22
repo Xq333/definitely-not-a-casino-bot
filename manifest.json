@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Partouche Auto-Player",
+  "version": "2.0.0",
+  "description": "Automates daily bonuses, wheel spins, and slot play on Partouche Online",
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://online.partouche.com/*",
+    "https://jeux-v2.ptech.fr/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://online.partouche.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://jeux-v2.ptech.fr/*"],
+      "js": ["game-content.js"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Partouche Auto-Player"
+  },
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
