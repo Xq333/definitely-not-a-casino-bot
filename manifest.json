@@ -31,6 +31,12 @@
     "default_popup": "popup.html",
     "default_title": "Partouche Auto-Player"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["game-bot-inject.js"],
+      "matches": ["https://jeux-v2.ptech.fr/*"]
+    }
+  ],
   "icons": {
     "48": "icon48.png",
     "128": "icon128.png"
