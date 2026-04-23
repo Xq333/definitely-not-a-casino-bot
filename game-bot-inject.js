@@ -33,7 +33,19 @@
 
     if (gameType === 'A') {
       const pi = root.script.playerInfo;
-      const BET_LEVELS = [500, 1000, 2500, 5000, 10000, 25000, 50000];
+      // Discover bet levels by testing the setter (it snaps to valid values)
+      const BET_LEVELS = [];
+      const testBets = [500,1000,2000,2500,3000,5000,10000,15000,20000,25000,30000,50000,75000,100000,150000,200000,250000,500000];
+      const origBet = pi.bet;
+      for (const v of testBets) {
+        pi.bet = v;
+        const actual = pi.bet;
+        if (BET_LEVELS.indexOf(actual) === -1) BET_LEVELS.push(actual);
+      }
+      BET_LEVELS.sort((a, b) => a - b);
+      pi.bet = origBet;
+      console.log('[PARTOUCHE BOT] Discovered bet levels:', JSON.stringify(BET_LEVELS));
+
       getBalance = () => pi.balance;
       getBet = () => pi.bet;
       setBet = (v) => { pi.bet = v; };
@@ -44,6 +56,8 @@
       const coinChoices = gl.coinChoices || [50, 100, 250, 500, 1250, 2500];
       const lines = gl.lines || 20;
       const BET_LEVELS = coinChoices.map(c => c * lines);
+      console.log('[PARTOUCHE BOT] Coin choices:', JSON.stringify(coinChoices), 'x', lines, 'lines = bets:', JSON.stringify(BET_LEVELS));
+
       getBalance = () => gl.balance;
       getBet = () => gl.totalBet;
       setBet = (totalBet) => {
@@ -54,7 +68,6 @@
         }
         gl.coin = bestCoin;
       };
-      // Use sendClick if available (like pressing space), fallback to inputSpin
       const bk = spinBtn?.script?.buttonKey;
       clickSpin = bk ? () => { bk.sendClick(); } : () => { gl.inputSpin(); };
       getBetLevels = () => BET_LEVELS;
